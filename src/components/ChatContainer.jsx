@@ -1,150 +1,121 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useRef, useEffect } from 'react';
 import { useChatContext } from '../context/ChatContext';
 import aiService from '../services/aiService';
 import ChatHeader from './ChatHeader';
 import ChatMessage from './ChatMessage';
 import ChatInput from './ChatInput';
-import TypingIndicator from './TypingIndicator';
-import EmptyState from './EmptyState';
+import { Bot } from 'lucide-react';
 
-const ChatContainer = ({ sidebarOpen }) => {
+const ChatContainer = ({ sidebarOpen, toggleSidebar }) => {
     const {
         currentModel,
         getCurrentMessages,
         addMessage,
-        clearCurrentConversation,
-        deleteLastResponse,
         isLoading,
         setIsLoading,
     } = useChatContext();
 
     const messagesEndRef = useRef(null);
-    const [error, setError] = useState(null);
     const messages = getCurrentMessages();
 
+    // Auto-scroll to bottom
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isLoading]);
 
-    useEffect(() => {
-        setError(null);
-    }, [currentModel]);
-
     const handleSendMessage = async (content) => {
-        if (!aiService.isModelConfigured(currentModel)) {
-            setError('Please configure the API key for this model in your .env file');
-            return;
-        }
-
-        setError(null);
-
+        // 1. Add User Message
         const userMessage = {
             role: 'user',
             content,
             timestamp: new Date().toISOString(),
         };
         addMessage(userMessage);
-
         setIsLoading(true);
 
         try {
+            // 2. Call API
             const conversationHistory = [...messages, userMessage];
             const response = await aiService.sendMessage(conversationHistory, currentModel);
 
+            // 3. Add AI Response
             if (response.success) {
-                const aiMessage = {
+                addMessage({
                     role: 'assistant',
                     content: response.message,
                     timestamp: new Date().toISOString(),
-                    usage: response.usage,
-                };
-                addMessage(aiMessage);
+                });
             } else {
-                setError(response.error);
-
-                const errorMessage = {
+                addMessage({
                     role: 'assistant',
-                    content: `Error: ${response.error}\n\nPlease check your API configuration and try again.`,
-                    timestamp: new Date().toISOString(),
+                    content: `Error: ${response.error}`,
                     isError: true,
-                };
-                addMessage(errorMessage);
+                });
             }
         } catch (err) {
-            console.error('Chat error:', err);
-            setError('An unexpected error occurred. Please try again.');
-
-            const errorMessage = {
+            addMessage({
                 role: 'assistant',
-                content: `Unexpected Error: ${err.message}\n\nPlease try again or check your internet connection.`,
-                timestamp: new Date().toISOString(),
+                content: "An unexpected error occurred. Please try again.",
                 isError: true,
-            };
-            addMessage(errorMessage);
+            });
         } finally {
             setIsLoading(false);
         }
     };
 
-    const handleSuggestionClick = (prompt) => {
-        handleSendMessage(prompt);
-    };
-
-    const handleToggleSidebar = () => {
-        const event = new CustomEvent('toggleSidebar');
-        window.dispatchEvent(event);
-    };
-
-    const isConfigured = aiService.isModelConfigured(currentModel);
-
     return (
-        <div className="flex flex-col h-screen bg-primary">
+        <div className="flex flex-col h-full w-full bg-white dark:bg-gray-900 transition-colors duration-200">
             {/* Header */}
-            <ChatHeader onToggleSidebar={handleToggleSidebar} />
+            <ChatHeader 
+                sidebarOpen={sidebarOpen} 
+                toggleSidebar={toggleSidebar} 
+                currentModel={currentModel} 
+            />
 
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto">
-                {messages.length === 0 ? (
-                    <EmptyState
-                        modelId={currentModel}
-                        onSuggestionClick={handleSuggestionClick}
-                    />
-                ) : (
-                    <div className="max-w-4xl mx-auto px-4 py-6">
-                        <AnimatePresence>
-                            {messages.map((message, index) => (
-                                <ChatMessage
-                                    key={index}
-                                    message={message}
-                                    modelId={currentModel}
-                                />
-                            ))}
-                        </AnimatePresence>
-
-                        {isLoading && <TypingIndicator modelId={currentModel} />}
-
-                        {error && !isLoading && (
-                            <motion.div
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="p-4 bg-card border border-primary rounded-xl text-secondary text-sm"
-                            >
-                                <strong>Error:</strong> {error}
-                            </motion.div>
-                        )}
-
-                        <div ref={messagesEndRef} />
-                    </div>
-                )}
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+                <div className="max-w-3xl mx-auto px-4 py-8 space-y-6">
+                    {messages.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-4 opacity-50">
+                            <div className="p-4 bg-gray-100 dark:bg-gray-800 rounded-full">
+                                <Bot size={32} className="text-gray-500 dark:text-gray-400" />
+                            </div>
+                            <h2 className="text-xl font-medium text-gray-700 dark:text-gray-300">
+                                How can I help you today?
+                            </h2>
+                        </div>
+                    ) : (
+                        messages.map((msg, idx) => (
+                            <ChatMessage key={idx} message={msg} />
+                        ))
+                    )}
+                    
+                    {/* Loading Indicator */}
+                    {isLoading && (
+                        <div className="flex gap-4 max-w-3xl w-full">
+                            <div className="w-8 h-8 rounded-full bg-black dark:bg-white flex items-center justify-center">
+                                <Bot size={16} className="text-white dark:text-black animate-pulse" />
+                            </div>
+                            <div className="flex items-center gap-1 h-8">
+                                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+                                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+                                <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></span>
+                            </div>
+                        </div>
+                    )}
+                    <div ref={messagesEndRef} />
+                </div>
             </div>
 
             {/* Input Area */}
-            <ChatInput
-                onSend={handleSendMessage}
-                isLoading={isLoading}
-                disabled={!isConfigured}
-            />
+            <div className="w-full bg-white dark:bg-gray-900 border-t border-gray-100 dark:border-transparent pb-6 pt-2">
+                <div className="max-w-3xl mx-auto px-4">
+                    <ChatInput onSendMessage={handleSendMessage} isLoading={isLoading} />
+                    <p className="text-center text-xs text-gray-400 mt-3">
+                        AI can make mistakes. Check important info.
+                    </p>
+                </div>
+            </div>
         </div>
     );
 };

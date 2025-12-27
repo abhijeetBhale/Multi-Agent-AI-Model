@@ -1,31 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { ChatProvider } from './context/ChatContext';
 import { ThemeProvider } from './context/ThemeContext';
 import Sidebar from './components/Sidebar';
 import ChatContainer from './components/ChatContainer';
 
 function App() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  useEffect(() => {
-    const handleToggle = () => {
-      setSidebarOpen(prev => !prev);
-    };
-
-    window.addEventListener('toggleSidebar', handleToggle);
-    return () => window.removeEventListener('toggleSidebar', handleToggle);
-  }, []);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   return (
     <ThemeProvider>
       <ChatProvider>
-        <div className="flex h-screen bg-primary text-primary overflow-hidden">
-          {/* Sidebar */}
+        <div className="flex h-screen bg-white dark:bg-gray-900 overflow-hidden">
+          {/* Sidebar with state passed down */}
           <Sidebar isOpen={sidebarOpen} setIsOpen={setSidebarOpen} />
 
-          {/* Main Chat Area */}
-          <div className="flex-1 flex flex-col">
-            <ChatContainer sidebarOpen={sidebarOpen} />
+          {/* Main Content Area */}
+          <div className="flex-1 flex flex-col h-full relative">
+            <ChatContainer 
+              sidebarOpen={sidebarOpen} 
+              toggleSidebar={() => setSidebarOpen(!sidebarOpen)} 
+            />
           </div>
         </div>
       </ChatProvider>
